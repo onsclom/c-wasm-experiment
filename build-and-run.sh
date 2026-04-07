@@ -1,1 +1,1 @@
-cc main.c -Wall && ./a.out
+cc src/test.c -Wall -Werror -o test && ./test
