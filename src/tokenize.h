@@ -1,7 +1,6 @@
 #pragma once
 
-#include "arena.h"
-#include "string.h"
+#include "base/base_inc.h"
 
 typedef enum {
   TOKEN_IDENTIFIER,
@@ -86,5 +85,5 @@ typedef struct {
   size_t error_pos;
 } TokenizeResult;
 
-static s8 token_type_name(TokenType type);
+s8 token_type_name(TokenType type);
 TokenizeResult tokenize(s8 source, Arena *arena);

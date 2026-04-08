@@ -43,46 +43,45 @@ static const s8 token_type_names[TOKEN_COUNT] = {
     [TOKEN_KEYWORD_FOR] = s8_lit("KW_FOR"),
 };
 
-static s8 token_type_name(TokenType type) {
+s8 token_type_name(TokenType type) {
   if (type >= 0 && type < TOKEN_COUNT && token_type_names[type].length > 0) {
     return token_type_names[type];
   }
   return s8_lit("UNKNOWN");
 }
 
-static size_t skip_char_or_escape(const char *src, size_t pos, size_t len) {
+size_t skip_char_or_escape(const u8 *src, size_t pos, size_t len) {
   if (pos < len && src[pos] == '\\')
     pos++;
   pos++;
   return pos;
 }
 
-static void emit_token(Arena *arena, TokenizeResult *result, TokenType type,
+void emit_token(Token *tokens, TokenizeResult *result, TokenType type,
                        size_t start, size_t end) {
-  Token *t = arena_alloc(arena, sizeof(Token), _Alignof(Token));
-  *t = (Token){type, start, end};
+  tokens[result->count] = (Token){type, start, end};
   result->count++;
 }
 
-static TokenizeResult tokenize_fail(s8 msg, size_t pos) {
+TokenizeResult tokenize_fail(s8 msg, size_t pos) {
   return (TokenizeResult){.ok = false, .error_message = msg, .error_pos = pos};
 }
 
 TokenizeResult tokenize(s8 source, Arena *arena) {
   size_t pos = 0;
   size_t len = source.length;
-  const char *src = source.data;
+  const u8 *src = source.data;
 
-  size_t tokens_start = align_forward(arena->len, _Alignof(Token));
+  Token *tokens = arena_alloc(arena, len * sizeof(Token));
   TokenizeResult result = {
       .ok = true,
-      .tokens = (Token *)(arena->base + tokens_start),
+      .tokens = tokens,
       .count = 0,
   };
 
   while (pos < len) {
-    const char cur = src[pos];
-    char next = (pos + 1 < len) ? src[pos + 1] : '\0';
+    u8 cur = src[pos];
+    u8 next = (pos + 1 < len) ? src[pos + 1] : '\0';
 
     if (cur == ' ' || cur == '\t' || cur == '\n' || cur == '\r') {
       pos++;
@@ -91,117 +90,117 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
 
     switch (cur) {
     case ';':
-      emit_token(arena, &result, TOKEN_SEMICOLON, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_SEMICOLON, pos, pos + 1);
       pos++;
       continue;
     case '(':
-      emit_token(arena, &result, TOKEN_LPAREN, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_LPAREN, pos, pos + 1);
       pos++;
       continue;
     case ')':
-      emit_token(arena, &result, TOKEN_RPAREN, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_RPAREN, pos, pos + 1);
       pos++;
       continue;
     case '{':
-      emit_token(arena, &result, TOKEN_LBRACE, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_LBRACE, pos, pos + 1);
       pos++;
       continue;
     case '}':
-      emit_token(arena, &result, TOKEN_RBRACE, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_RBRACE, pos, pos + 1);
       pos++;
       continue;
     case '[':
-      emit_token(arena, &result, TOKEN_LBRACKET, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_LBRACKET, pos, pos + 1);
       pos++;
       continue;
     case ']':
-      emit_token(arena, &result, TOKEN_RBRACKET, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_RBRACKET, pos, pos + 1);
       pos++;
       continue;
     case ',':
-      emit_token(arena, &result, TOKEN_COMMA, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_COMMA, pos, pos + 1);
       pos++;
       continue;
     case ':':
-      emit_token(arena, &result, TOKEN_COLON, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_COLON, pos, pos + 1);
       pos++;
       continue;
     case '+':
       if (next == '+') {
-        emit_token(arena, &result, TOKEN_PLUS_PLUS, pos, pos + 2);
+        emit_token(tokens, &result, TOKEN_PLUS_PLUS, pos, pos + 2);
         pos += 2;
       } else {
-        emit_token(arena, &result, TOKEN_PLUS, pos, pos + 1);
+        emit_token(tokens, &result, TOKEN_PLUS, pos, pos + 1);
         pos++;
       }
       continue;
     case '-':
       if (next == '-') {
-        emit_token(arena, &result, TOKEN_MINUS_MINUS, pos, pos + 2);
+        emit_token(tokens, &result, TOKEN_MINUS_MINUS, pos, pos + 2);
         pos += 2;
       } else {
-        emit_token(arena, &result, TOKEN_MINUS, pos, pos + 1);
+        emit_token(tokens, &result, TOKEN_MINUS, pos, pos + 1);
         pos++;
       }
       continue;
     case '*':
-      emit_token(arena, &result, TOKEN_STAR, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_STAR, pos, pos + 1);
       pos++;
       continue;
     case '/':
-      emit_token(arena, &result, TOKEN_DIVIDE, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_DIVIDE, pos, pos + 1);
       pos++;
       continue;
     case '%':
-      emit_token(arena, &result, TOKEN_PERCENT, pos, pos + 1);
+      emit_token(tokens, &result, TOKEN_PERCENT, pos, pos + 1);
       pos++;
       continue;
     case '=':
       if (next == '=') {
-        emit_token(arena, &result, TOKEN_EQ_EQ, pos, pos + 2);
+        emit_token(tokens, &result, TOKEN_EQ_EQ, pos, pos + 2);
         pos += 2;
       } else {
-        emit_token(arena, &result, TOKEN_EQ, pos, pos + 1);
+        emit_token(tokens, &result, TOKEN_EQ, pos, pos + 1);
         pos++;
       }
       continue;
     case '!':
       if (next == '=') {
-        emit_token(arena, &result, TOKEN_BANG_EQ, pos, pos + 2);
+        emit_token(tokens, &result, TOKEN_BANG_EQ, pos, pos + 2);
         pos += 2;
       } else {
-        emit_token(arena, &result, TOKEN_BANG, pos, pos + 1);
+        emit_token(tokens, &result, TOKEN_BANG, pos, pos + 1);
         pos++;
       }
       continue;
     case '<':
       if (next == '=') {
-        emit_token(arena, &result, TOKEN_LT_EQ, pos, pos + 2);
+        emit_token(tokens, &result, TOKEN_LT_EQ, pos, pos + 2);
         pos += 2;
       } else {
-        emit_token(arena, &result, TOKEN_LT, pos, pos + 1);
+        emit_token(tokens, &result, TOKEN_LT, pos, pos + 1);
         pos++;
       }
       continue;
     case '>':
       if (next == '=') {
-        emit_token(arena, &result, TOKEN_GT_EQ, pos, pos + 2);
+        emit_token(tokens, &result, TOKEN_GT_EQ, pos, pos + 2);
         pos += 2;
       } else {
-        emit_token(arena, &result, TOKEN_GT, pos, pos + 1);
+        emit_token(tokens, &result, TOKEN_GT, pos, pos + 1);
         pos++;
       }
       continue;
     case '&':
       if (next == '&') {
-        emit_token(arena, &result, TOKEN_AND_AND, pos, pos + 2);
+        emit_token(tokens, &result, TOKEN_AND_AND, pos, pos + 2);
         pos += 2;
         continue;
       }
       return tokenize_fail(s8_lit("Expected '&&', got single '&'"), pos);
     case '|':
       if (next == '|') {
-        emit_token(arena, &result, TOKEN_OR_OR, pos, pos + 2);
+        emit_token(tokens, &result, TOKEN_OR_OR, pos, pos + 2);
         pos += 2;
         continue;
       }
@@ -218,9 +217,9 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
         pos++;
         while (pos < len && is_digit(src[pos]))
           pos++;
-        emit_token(arena, &result, TOKEN_FLOAT_LITERAL, start, pos);
+        emit_token(tokens, &result, TOKEN_FLOAT_LITERAL, start, pos);
       } else {
-        emit_token(arena, &result, TOKEN_INT_LITERAL, start, pos);
+        emit_token(tokens, &result, TOKEN_INT_LITERAL, start, pos);
       }
       continue;
     }
@@ -231,9 +230,10 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
       while (pos < len && src[pos] != '"')
         pos = skip_char_or_escape(src, pos, len);
       if (pos >= len)
-        return tokenize_fail(s8_lit("Unterminated string literal, missing closing '\"'"), start);
+        return tokenize_fail(
+            s8_lit("Unterminated string literal, missing closing '\"'"), start);
       pos++;
-      emit_token(arena, &result, TOKEN_STRING_LITERAL, start, pos);
+      emit_token(tokens, &result, TOKEN_STRING_LITERAL, start, pos);
       continue;
     }
 
@@ -242,17 +242,18 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
       pos++;
       pos = skip_char_or_escape(src, pos, len);
       if (pos >= len || src[pos] != '\'')
-        return tokenize_fail(s8_lit("Unterminated char literal, missing closing '\\''"), start);
+        return tokenize_fail(
+            s8_lit("Unterminated char literal, missing closing '\\''"), start);
       pos++;
-      emit_token(arena, &result, TOKEN_CHAR_LITERAL, start, pos);
+      emit_token(tokens, &result, TOKEN_CHAR_LITERAL, start, pos);
       continue;
     }
 
-    if (is_alpha(cur)) {
+    if (is_alpha(cur) || cur == '_') {
       size_t start = pos;
       while (pos < len && is_alnum(src[pos]))
         pos++;
-      s8 ident = {.data = (char *)(src + start), .length = pos - start};
+      s8 ident = {.data = (u8 *)(src + start), .length = pos - start};
       TokenType type = TOKEN_IDENTIFIER;
       if (s8_eq(ident, s8_lit("int")))
         type = TOKEN_KEYWORD_INT;
@@ -272,11 +273,14 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
         type = TOKEN_KEYWORD_WHILE;
       else if (s8_eq(ident, s8_lit("for")))
         type = TOKEN_KEYWORD_FOR;
-      emit_token(arena, &result, type, start, pos);
+      emit_token(tokens, &result, type, start, pos);
       continue;
     }
 
     return tokenize_fail(s8_lit("Unexpected character"), pos);
   }
+  // trim arena to actual token count
+  arena->len =
+      (size_t)((u8 *)tokens - arena->base) + result.count * sizeof(Token);
   return result;
 }

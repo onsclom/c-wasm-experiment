@@ -1,27 +1,25 @@
-#include "arena.c"
-#include "string.c"
+#include "base/base_inc.c"
 #include "tokenize.c"
 #include <stdio.h>
 
 static u8 arena_mem[64 * 1024];
 static Arena arena;
 
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
+static i32 tests_run = 0;
+static i32 tests_passed = 0;
+static i32 tests_failed = 0;
 
 typedef struct {
   TokenType type;
   const char *text;
 } Expected;
 
-
 static void test_tokens(const char *name, const char *input,
                         const Expected *expected, size_t expected_count) {
   tests_run++;
   arena_reset(&arena);
 
-  s8 source = {.data = (char *)input, .length = 0};
+  s8 source = {.data = (u8 *)input, .length = 0};
   while (input[source.length])
     source.length++;
 
@@ -30,8 +28,8 @@ static void test_tokens(const char *name, const char *input,
   if (!result.ok) {
     tests_failed++;
     printf("  FAIL  %s\n", name);
-    printf("        tokenize error: %.*s\n", (int)result.error_message.length,
-           result.error_message.data);
+    printf("        tokenize error: %.*s\n", (i32)result.error_message.length,
+           (char *)result.error_message.data);
     return;
   }
 
@@ -47,7 +45,7 @@ static void test_tokens(const char *name, const char *input,
       }
       // check text match
       size_t tok_len = tok->end - tok->start;
-      const char *tok_text = source.data + tok->start;
+      const u8 *tok_text = source.data + tok->start;
       const char *exp_text = expected[i].text;
       size_t exp_len = 0;
       while (exp_text[exp_len])
@@ -83,7 +81,8 @@ static void test_tokens(const char *name, const char *input,
       if (i < result.count) {
         Token *tok = &result.tokens[i];
         s8 name = token_type_name(tok->type);
-        snprintf(got_buf, sizeof(got_buf), "%.*s", (int)name.length, name.data);
+        snprintf(got_buf, sizeof(got_buf), "%.*s", (i32)name.length,
+                 (char *)name.data);
         size_t tok_len = tok->end - tok->start;
         if (tok_len >= sizeof(got_text))
           tok_len = sizeof(got_text) - 1;
@@ -93,7 +92,8 @@ static void test_tokens(const char *name, const char *input,
       }
       if (i < expected_count) {
         s8 name = token_type_name(expected[i].type);
-        snprintf(exp_buf, sizeof(exp_buf), "%.*s", (int)name.length, name.data);
+        snprintf(exp_buf, sizeof(exp_buf), "%.*s", (i32)name.length,
+                 (char *)name.data);
         snprintf(exp_text, sizeof(exp_text), "%s", expected[i].text);
       }
 
@@ -111,7 +111,7 @@ static void test_error(const char *name, const char *input,
   tests_run++;
   arena_reset(&arena);
 
-  s8 source = {.data = (char *)input, .length = 0};
+  s8 source = {.data = (u8 *)input, .length = 0};
   while (input[source.length])
     source.length++;
 
@@ -144,7 +144,7 @@ static void test_error(const char *name, const char *input,
       tests_failed++;
       printf("  FAIL  %s\n", name);
       printf("        expected error \"%s\", got \"%.*s\"\n", expected_msg,
-             (int)msg.length, msg.data);
+             (i32)msg.length, (char *)msg.data);
       return;
     }
   }
@@ -420,8 +420,10 @@ int main(void) {
   test_error("unexpected character", "@", "Unexpected character");
   test_error("bare ampersand", "&x", "Expected '&&', got single '&'");
   test_error("bare pipe", "|x", "Expected '||', got single '|'");
-  test_error("unterminated string", "\"hello", "Unterminated string literal, missing closing '\"'");
-  test_error("unterminated char", "'a", "Unterminated char literal, missing closing '\\''");
+  test_error("unterminated string", "\"hello",
+             "Unterminated string literal, missing closing '\"'");
+  test_error("unterminated char", "'a",
+             "Unterminated char literal, missing closing '\\''");
 
   // summary
   printf("\n========================================\n");
