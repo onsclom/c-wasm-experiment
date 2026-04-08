@@ -418,10 +418,10 @@ int main(void) {
   printf("\n--- errors ---\n");
 
   test_error("unexpected character", "@", "Unexpected character");
-  test_error("bare ampersand", "&x", "Expected '&&'");
-  test_error("bare pipe", "|x", "Expected '||'");
-  test_error("unterminated string", "\"hello", "Unterminated string literal");
-  test_error("unterminated char", "'a", "Unterminated char literal");
+  test_error("bare ampersand", "&x", "Expected '&&', got single '&'");
+  test_error("bare pipe", "|x", "Expected '||', got single '|'");
+  test_error("unterminated string", "\"hello", "Unterminated string literal, missing closing '\"'");
+  test_error("unterminated char", "'a", "Unterminated char literal, missing closing '\\''");
 
   // summary
   printf("\n========================================\n");
