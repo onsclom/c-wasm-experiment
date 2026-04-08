@@ -83,6 +83,7 @@ typedef struct {
 
   bool ok;
   s8 error_message;
+  size_t error_pos;
 } TokenizeResult;
 
 static s8 token_type_name(TokenType type);

@@ -64,8 +64,8 @@ static void emit_token(Arena *arena, TokenizeResult *result, TokenType type,
   result->count++;
 }
 
-static TokenizeResult tokenize_fail(s8 msg) {
-  return (TokenizeResult){.ok = false, .error_message = msg};
+static TokenizeResult tokenize_fail(s8 msg, size_t pos) {
+  return (TokenizeResult){.ok = false, .error_message = msg, .error_pos = pos};
 }
 
 TokenizeResult tokenize(s8 source, Arena *arena) {
@@ -198,14 +198,14 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
         pos += 2;
         continue;
       }
-      return tokenize_fail(s8_lit("Expected '&&'"));
+      return tokenize_fail(s8_lit("Expected '&&', got single '&'"), pos);
     case '|':
       if (next == '|') {
         emit_token(arena, &result, TOKEN_OR_OR, pos, pos + 2);
         pos += 2;
         continue;
       }
-      return tokenize_fail(s8_lit("Expected '||'"));
+      return tokenize_fail(s8_lit("Expected '||', got single '|'"), pos);
     default:
       break;
     }
@@ -231,7 +231,7 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
       while (pos < len && src[pos] != '"')
         pos = skip_char_or_escape(src, pos, len);
       if (pos >= len)
-        return tokenize_fail(s8_lit("Unterminated string literal"));
+        return tokenize_fail(s8_lit("Unterminated string literal, missing closing '\"'"), start);
       pos++;
       emit_token(arena, &result, TOKEN_STRING_LITERAL, start, pos);
       continue;
@@ -242,7 +242,7 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
       pos++;
       pos = skip_char_or_escape(src, pos, len);
       if (pos >= len || src[pos] != '\'')
-        return tokenize_fail(s8_lit("Unterminated char literal"));
+        return tokenize_fail(s8_lit("Unterminated char literal, missing closing '\\''"), start);
       pos++;
       emit_token(arena, &result, TOKEN_CHAR_LITERAL, start, pos);
       continue;
@@ -276,7 +276,7 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
       continue;
     }
 
-    return tokenize_fail(s8_lit("Unexpected character"));
+    return tokenize_fail(s8_lit("Unexpected character"), pos);
   }
   return result;
 }
