@@ -53,12 +53,13 @@ s8 token_type_name(TokenType type) {
 size_t skip_char_or_escape(const u8 *src, size_t pos, size_t len) {
   if (pos < len && src[pos] == '\\')
     pos++;
-  pos++;
+  if (pos < len)
+    pos++;
   return pos;
 }
 
 void emit_token(Token *tokens, TokenizeResult *result, TokenType type,
-                       size_t start, size_t end) {
+                size_t start, size_t end) {
   tokens[result->count] = (Token){type, start, end};
   result->count++;
 }
@@ -72,6 +73,7 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
   size_t len = source.length;
   const u8 *src = source.data;
 
+  // worst case is 1 token per char
   Token *tokens = arena_alloc(arena, len * sizeof(Token));
   TokenizeResult result = {
       .ok = true,
@@ -251,7 +253,7 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
 
     if (is_alpha(cur) || cur == '_') {
       size_t start = pos;
-      while (pos < len && is_alnum(src[pos]))
+      while (pos < len && (is_alnum(src[pos]) || src[pos] == '_'))
         pos++;
       s8 ident = {.data = (u8 *)(src + start), .length = pos - start};
       TokenType type = TOKEN_IDENTIFIER;
@@ -279,8 +281,5 @@ TokenizeResult tokenize(s8 source, Arena *arena) {
 
     return tokenize_fail(s8_lit("Unexpected character"), pos);
   }
-  // trim arena to actual token count
-  arena->len =
-      (size_t)((u8 *)tokens - arena->base) + result.count * sizeof(Token);
   return result;
 }
