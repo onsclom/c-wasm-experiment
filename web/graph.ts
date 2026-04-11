@@ -24,7 +24,7 @@ interface Edge {
 const REPULSION = 3000;
 const ATTRACTION = 0.08;
 const IDEAL_EDGE_LEN = 90;
-const MAX_EDGE_LEN = 250;
+const MAX_EDGE_LEN = 200;
 const DAMPING = 0.85;
 const MAX_SPEED = 800;
 
