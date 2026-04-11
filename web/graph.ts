@@ -31,10 +31,7 @@ const MAX_SPEED = 800;
 const NODE_H = 24;
 const NODE_PAD_X = 12;
 const NODE_FONT = "13px monospace";
-const NODE_COLOR = "#335";
 const NODE_HIGHLIGHT = "#06c";
-const EDGE_COLOR = "#aaa";
-const TEXT_COLOR = "#fff";
 
 // --- measure node widths (needs a canvas ctx) ---
 
@@ -283,16 +280,7 @@ export function fitCamera(
 
 const DOT_COLOR = "#d0d0d0";
 const DOT_RADIUS = 2;
-const TARGET_SCREEN_SPACING = 16; // desired px between dots on screen
-
-// snap to a 1-2-5 sequence for clean grid intervals
-function niceStep(rough: number): number {
-  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
-  const norm = rough / pow;
-  if (norm <= 2) return 2 * pow;
-  if (norm <= 5) return 5 * pow;
-  return 10 * pow;
-}
+const TARGET_SCREEN_SPACING = 32; // desired px between dots on screen
 
 export function drawDotGrid(
   ctx: CanvasRenderingContext2D,
@@ -304,19 +292,39 @@ export function drawDotGrid(
   const tl = screenToWorld(cam, 0, 0, canvasW, canvasH);
   const br = screenToWorld(cam, canvasW, canvasH, canvasW, canvasH);
 
-  // pick grid spacing: target ~48 screen-px, snapped to a nice number
   const rawStep = TARGET_SCREEN_SPACING / cam.zoom;
-  const step = niceStep(rawStep);
 
-  const startX = Math.floor(tl.x / step) * step;
-  const startY = Math.floor(tl.y / step) * step;
+  // snap to power-of-2 steps: ..., 0.5, 1, 2, 4, 8, ...
+  const log2Raw = Math.log2(rawStep);
+  const coarseStep = Math.pow(2, Math.ceil(log2Raw));
+  const fineStep = coarseStep / 2;
+
+  // t: 0 at coarse boundary (fine dots invisible), 1 at fine boundary (fully visible)
+  const t = (coarseStep - rawStep) / fineStep;
 
   // dot size scales slightly with zoom so they don't vanish or bloat
   const r = DOT_RADIUS / cam.zoom;
 
+  // draw fine grid dots at faded opacity (coarse dots drawn on top will cover them)
+  if (t > 0.01) {
+    ctx.fillStyle = `rgba(208,208,208,${t})`;
+    const startX = Math.floor(tl.x / fineStep) * fineStep;
+    const startY = Math.floor(tl.y / fineStep) * fineStep;
+    for (let x = startX; x <= br.x; x += fineStep) {
+      for (let y = startY; y <= br.y; y += fineStep) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // draw coarse grid at full opacity on top
   ctx.fillStyle = DOT_COLOR;
-  for (let x = startX; x <= br.x; x += step) {
-    for (let y = startY; y <= br.y; y += step) {
+  const coarseStartX = Math.floor(tl.x / coarseStep) * coarseStep;
+  const coarseStartY = Math.floor(tl.y / coarseStep) * coarseStep;
+  for (let x = coarseStartX; x <= br.x; x += coarseStep) {
+    for (let y = coarseStartY; y <= br.y; y += coarseStep) {
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
