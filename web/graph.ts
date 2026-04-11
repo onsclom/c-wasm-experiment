@@ -24,12 +24,12 @@ interface Edge {
 const REPULSION = 3000;
 const ATTRACTION = 0.08;
 const IDEAL_EDGE_LEN = 90;
-const MAX_EDGE_LEN = 150;
+const MAX_EDGE_LEN = 250;
 const DAMPING = 0.85;
 const MAX_SPEED = 800;
 
-const NODE_H = 24;
-const NODE_PAD_X = 12;
+const NODE_PAD_X = 20;
+const NODE_PAD_Y = 12;
 const NODE_FONT = "13px monospace";
 const NODE_HIGHLIGHT = "#06c";
 
@@ -85,7 +85,7 @@ export function buildGraph(root: ASTNode): {
       vx: 0,
       vy: 0,
       w: 100,
-      h: NODE_H,
+      h: 13 + NODE_PAD_Y * 2,
     });
 
     if (ast.children.length === 0) return;
@@ -239,8 +239,8 @@ export function settleAndFitCamera(
   canvasW: number,
   canvasH: number,
 ) {
-  // run ~2 seconds of simulation at 60fps
-  for (let i = 0; i < 120; i++) {
+  const settleTime = 1000;
+  for (let i = 0; i < settleTime; i++) {
     simulate(nodes, edges, 16.67, null);
   }
 
