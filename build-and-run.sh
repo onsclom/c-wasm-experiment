@@ -1,1 +1,1 @@
-cc src/test.c -Wall -Werror -o test && ./test
+cc test/test.c -Wall -Werror -o test_runner && ./test_runner

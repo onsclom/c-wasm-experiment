@@ -1,2 +1,2 @@
 @echo off
-gcc src/test.c -Wall -Werror -o test.exe && test.exe
+gcc test/test.c -Wall -Werror -o test_runner.exe && test_runner.exe
