@@ -125,7 +125,10 @@ export function setupCameraControls(
     // world pos under cursor before zoom
     const before = screenToWorld(cam, sx, sy, cw, ch);
 
-    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    // trackpad pinch-zoom fires with ctrlKey and small deltaY values;
+    // use a gentler sensitivity for those events
+    const sensitivity = e.ctrlKey ? 0.01 : 0.002;
+    const factor = Math.pow(2, -e.deltaY * sensitivity);
     cam.zoom = Math.max(0.1, Math.min(10, cam.zoom * factor));
 
     // world pos under cursor after zoom
