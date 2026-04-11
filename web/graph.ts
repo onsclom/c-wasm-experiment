@@ -1,5 +1,6 @@
 import type { ASTNode } from "./parser";
 import type { Camera } from "./camera";
+import { screenToWorld } from "./camera";
 
 // --- graph node / edge types ---
 
@@ -23,6 +24,7 @@ interface Edge {
 const REPULSION = 3000;
 const ATTRACTION = 0.08;
 const IDEAL_EDGE_LEN = 90;
+const MAX_EDGE_LEN = 150;
 const DAMPING = 0.85;
 const MAX_SPEED = 800;
 
@@ -36,7 +38,10 @@ const TEXT_COLOR = "#fff";
 
 // --- measure node widths (needs a canvas ctx) ---
 
-export function measureNodes(ctx: CanvasRenderingContext2D, nodes: GraphNode[]) {
+export function measureNodes(
+  ctx: CanvasRenderingContext2D,
+  nodes: GraphNode[],
+) {
   ctx.font = NODE_FONT;
   for (const n of nodes) {
     const label = `${n.ast.type}: ${n.ast.text}`;
@@ -44,30 +49,64 @@ export function measureNodes(ctx: CanvasRenderingContext2D, nodes: GraphNode[]) 
   }
 }
 
-// --- build flat arrays from AST ---
+// --- build flat arrays from AST (radial layout) ---
 
-export function buildGraph(root: ASTNode): { nodes: GraphNode[]; edges: Edge[] } {
+// count leaves so we can proportion angular slices
+function subtreeLeafCount(ast: ASTNode): number {
+  if (ast.children.length === 0) return 1;
+  let count = 0;
+  for (const c of ast.children) count += subtreeLeafCount(c);
+  return count;
+}
+
+const RADIAL_STEP = 100; // distance per depth level from center
+
+export function buildGraph(root: ASTNode): {
+  nodes: GraphNode[];
+  edges: Edge[];
+} {
   const nodes: GraphNode[] = [];
   const edges: Edge[] = [];
 
-  function visit(ast: ASTNode, depth: number, sibIdx: number) {
+  // root goes at origin
+  // each child gets an angular slice proportional to its leaf count
+  // within that slice, grandchildren subdivide further
+
+  function visit(
+    ast: ASTNode,
+    depth: number,
+    angleStart: number, // radians
+    angleEnd: number, // radians
+  ) {
+    const angle = (angleStart + angleEnd) / 2;
+    const radius = depth * RADIAL_STEP;
     const idx = nodes.length;
     nodes.push({
       ast,
-      x: sibIdx * 120 + Math.random() * 10,
-      y: depth * 100 + Math.random() * 10,
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
       vx: 0,
       vy: 0,
-      w: 100, // placeholder until measured
+      w: 100,
       h: NODE_H,
     });
-    for (let i = 0; i < ast.children.length; i++) {
+
+    if (ast.children.length === 0) return;
+
+    const totalLeaves = subtreeLeafCount(ast);
+    let currentAngle = angleStart;
+
+    for (const child of ast.children) {
+      const childLeaves = subtreeLeafCount(child);
+      const childSlice = (childLeaves / totalLeaves) * (angleEnd - angleStart);
       const childIdx = nodes.length;
-      visit(ast.children[i], depth + 1, i);
+      visit(child, depth + 1, currentAngle, currentAngle + childSlice);
       edges.push({ from: idx, to: childIdx });
+      currentAngle += childSlice;
     }
   }
-  visit(root, 0, 0);
+
+  visit(root, 0, 0, Math.PI * 2);
   return { nodes, edges };
 }
 
@@ -155,6 +194,43 @@ export function simulate(
     nodes[i].x += nodes[i].vx * dtS;
     nodes[i].y += nodes[i].vy * dtS;
   }
+
+  // hard distance constraint on edges — if two connected nodes are further
+  // than MAX_EDGE_LEN apart, pull them both toward each other (or just the
+  // non-dragged one if one is being dragged)
+  for (let iter = 0; iter < 3; iter++) {
+    for (const e of edges) {
+      const a = nodes[e.from];
+      const b = nodes[e.to];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= MAX_EDGE_LEN) continue;
+
+      const excess = dist - MAX_EDGE_LEN;
+      const nx = dx / dist;
+      const ny = dy / dist;
+
+      const aIsDragged = e.from === dragIdx;
+      const bIsDragged = e.to === dragIdx;
+
+      if (aIsDragged) {
+        // only move b
+        b.x -= nx * excess;
+        b.y -= ny * excess;
+      } else if (bIsDragged) {
+        // only move a
+        a.x += nx * excess;
+        a.y += ny * excess;
+      } else {
+        // split correction equally
+        a.x += nx * (excess / 2);
+        a.y += ny * (excess / 2);
+        b.x -= nx * (excess / 2);
+        b.y -= ny * (excess / 2);
+      }
+    }
+  }
 }
 
 // --- pre-settle: run simulation ahead of time, then fit camera ---
@@ -203,17 +279,65 @@ export function fitCamera(
   cam.zoom = Math.min(canvasW / boundsW, canvasH / boundsH, 2);
 }
 
+// --- dot grid background ---
+
+const DOT_COLOR = "#d0d0d0";
+const DOT_RADIUS = 2;
+const TARGET_SCREEN_SPACING = 16; // desired px between dots on screen
+
+// snap to a 1-2-5 sequence for clean grid intervals
+function niceStep(rough: number): number {
+  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / pow;
+  if (norm <= 2) return 2 * pow;
+  if (norm <= 5) return 5 * pow;
+  return 10 * pow;
+}
+
+export function drawDotGrid(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  canvasW: number,
+  canvasH: number,
+) {
+  // figure out visible world bounds
+  const tl = screenToWorld(cam, 0, 0, canvasW, canvasH);
+  const br = screenToWorld(cam, canvasW, canvasH, canvasW, canvasH);
+
+  // pick grid spacing: target ~48 screen-px, snapped to a nice number
+  const rawStep = TARGET_SCREEN_SPACING / cam.zoom;
+  const step = niceStep(rawStep);
+
+  const startX = Math.floor(tl.x / step) * step;
+  const startY = Math.floor(tl.y / step) * step;
+
+  // dot size scales slightly with zoom so they don't vanish or bloat
+  const r = DOT_RADIUS / cam.zoom;
+
+  ctx.fillStyle = DOT_COLOR;
+  for (let x = startX; x <= br.x; x += step) {
+    for (let y = startY; y <= br.y; y += step) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
 // --- rendering ---
 
 export function drawGraph(
   ctx: CanvasRenderingContext2D,
+  cam: Camera,
   nodes: GraphNode[],
   edges: Edge[],
   highlightIdx: number | null,
 ) {
+  const invZoom = 1 / cam.zoom;
+
   // edges
-  ctx.strokeStyle = EDGE_COLOR;
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = invZoom * 4;
   for (const e of edges) {
     const a = nodes[e.from];
     const b = nodes[e.to];
@@ -225,19 +349,21 @@ export function drawGraph(
 
   // nodes
   ctx.font = NODE_FONT;
+  ctx.lineWidth = 2;
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
     const label = `${n.ast.type}: ${n.ast.text}`;
     const isHighlight = i === highlightIdx;
 
-    ctx.fillStyle = isHighlight ? NODE_HIGHLIGHT : NODE_COLOR;
     const rx = n.x - n.w / 2;
     const ry = n.y - n.h / 2;
-    ctx.beginPath();
-    ctx.roundRect(rx, ry, n.w, n.h, 4);
-    ctx.fill();
 
-    ctx.fillStyle = TEXT_COLOR;
+    ctx.fillStyle = isHighlight ? "#e8f0fe" : "#fff";
+    ctx.fillRect(rx, ry, n.w, n.h);
+    ctx.strokeStyle = isHighlight ? NODE_HIGHLIGHT : "#000";
+    ctx.strokeRect(rx, ry, n.w, n.h);
+
+    ctx.fillStyle = "#000";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, n.x, n.y);
@@ -267,10 +393,7 @@ export function hitTest(
 
 // --- find deepest AST node containing a source position ---
 
-export function findNodeAtPos(
-  nodes: GraphNode[],
-  pos: number,
-): number | null {
+export function findNodeAtPos(nodes: GraphNode[], pos: number): number | null {
   let bestIdx: number | null = null;
   let bestSize = Infinity;
   for (let i = 0; i < nodes.length; i++) {

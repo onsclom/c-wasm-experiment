@@ -27,7 +27,7 @@ export function setupCameraControls(
   canvas: HTMLCanvasElement,
   cam: Camera,
   callbacks: {
-    onMouseDown?: (wx: number, wy: number, e: MouseEvent) => void;
+    onMouseDown?: (wx: number, wy: number, e: MouseEvent) => boolean; // return true if handled (e.g. drag)
     onMouseMove?: (wx: number, wy: number, sx: number, sy: number, e: MouseEvent) => void;
     onMouseUp?: () => void;
   },
@@ -35,6 +35,14 @@ export function setupCameraControls(
   let isPanning = false;
   let lastX = 0;
   let lastY = 0;
+
+  function updateCursor(e: MouseEvent | KeyboardEvent) {
+    if (isPanning) {
+      canvas.style.cursor = "grabbing";
+    } else if ("shiftKey" in e && e.shiftKey) {
+      canvas.style.cursor = "grab";
+    }
+  }
 
   canvas.addEventListener("mousedown", (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -49,11 +57,23 @@ export function setupCameraControls(
       isPanning = true;
       lastX = e.clientX;
       lastY = e.clientY;
+      canvas.style.cursor = "move";
       e.preventDefault();
       return;
     }
 
-    callbacks.onMouseDown?.(wx, wy, e);
+    // let callback handle it (node drag); if not handled, start panning
+    if (e.button === 0) {
+      const handled = callbacks.onMouseDown?.(wx, wy, e) ?? false;
+      if (!handled) {
+        isPanning = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        canvas.style.cursor = "move";
+      } else {
+        canvas.style.cursor = "grabbing";
+      }
+    }
   });
 
   window.addEventListener("mousemove", (e) => {
@@ -64,6 +84,7 @@ export function setupCameraControls(
       cam.y -= dy / cam.zoom;
       lastX = e.clientX;
       lastY = e.clientY;
+      canvas.style.cursor = "move";
       return;
     }
 
@@ -77,11 +98,20 @@ export function setupCameraControls(
   });
 
   window.addEventListener("mouseup", () => {
-    if (isPanning) {
-      isPanning = false;
-      return;
+    const wasPanning = isPanning;
+    isPanning = false;
+    if (!wasPanning) {
+      callbacks.onMouseUp?.();
     }
-    callbacks.onMouseUp?.();
+    canvas.style.cursor = "crosshair";
+  });
+
+  // shift key cursor feedback
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Shift") canvas.style.cursor = "move";
+  });
+  window.addEventListener("keyup", (e) => {
+    if (e.key === "Shift" && !isPanning) canvas.style.cursor = "crosshair";
   });
 
   canvas.addEventListener("wheel", (e) => {

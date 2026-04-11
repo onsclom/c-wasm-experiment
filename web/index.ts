@@ -4,6 +4,7 @@ import {
   buildGraph,
   simulate,
   drawGraph,
+  drawDotGrid,
   hitTest,
   findNodeAtPos,
   measureNodes,
@@ -14,12 +15,8 @@ import { createCamera, applyCamera, setupCameraControls } from "./camera";
 
 // --- build DOM ---
 
-const toolbar = document.createElement("div");
-toolbar.style.cssText =
-  "display:flex; align-items:center; gap:10px; padding:8px 12px;";
-
 const title = document.createElement("strong");
-title.textContent = "parser visualizer";
+title.textContent = "parser ast visualizer";
 
 const actionBtn = document.createElement("button");
 actionBtn.textContent = "parse";
@@ -28,27 +25,38 @@ actionBtn.style.cssText = "padding:6px 20px; font-size:15px;";
 const errorDisplay = document.createElement("span");
 errorDisplay.style.cssText = "color:red; font-size:13px;";
 
-toolbar.append(title, actionBtn, errorDisplay);
+const header = document.createElement("div");
+header.style.cssText = "display:flex; align-items:center; gap:10px; padding:8px 12px; flex-shrink:0;";
+header.append(title, actionBtn, errorDisplay);
 
 const main = document.createElement("div");
 main.style.cssText = "flex:1; display:flex; overflow:hidden;";
 
 // editor view
 const editorView = document.createElement("div");
-editorView.style.cssText = "flex:1; display:flex; padding:8px 12px 12px;";
+editorView.style.cssText = "flex:1; display:flex; flex-direction:column;";
 
 const codeInput = document.createElement("textarea");
 codeInput.spellcheck = false;
 codeInput.placeholder = "Write some C code...";
-codeInput.value = `int main() {
-    int x = 5;
-    int y = 10;
-    return x + y;
+codeInput.value = `int square(int x) {
+    return x * x;
+}
+
+int add(int a, int b) {
+    return a + b;
+}
+
+int main() {
+    int a = square(3);
+    int b = add(a, 10);
+    int c = a * b + 2;
+    return c % 5 == 0 || c > 100;
 }`;
 codeInput.style.cssText =
-  "flex:1; font-family:monospace; font-size:14px; tab-size:4; resize:none; padding:8px;";
+  "flex:1; font-family:monospace; font-size:14px; tab-size:4; resize:none; padding:8px 12px;";
 
-editorView.append(codeInput);
+editorView.append(header, codeInput);
 
 // split view
 const splitView = document.createElement("div");
@@ -56,23 +64,61 @@ splitView.style.cssText = "flex:1; display:none;";
 
 const codePanel = document.createElement("div");
 codePanel.style.cssText =
-  "width:50%; overflow:auto; border-right:1px solid; padding:8px 12px; cursor:default;";
+  "width:50%; display:flex; flex-direction:column; cursor:default;";
 
 const codeDisplay = document.createElement("pre");
 codeDisplay.style.cssText =
   "font-family:monospace; font-size:14px; white-space:pre; line-height:1.5;";
-codePanel.append(codeDisplay);
+const codeScroll = document.createElement("div");
+codeScroll.style.cssText = "flex:1; overflow:auto; padding:0 12px 12px;";
+codeScroll.append(codeDisplay);
+codePanel.append(codeScroll);
+
+const divider = document.createElement("div");
+divider.style.cssText =
+  "width:16px; margin-left:-8px; margin-right:-8px; cursor:col-resize; flex-shrink:0; display:flex; justify-content:center; position:relative; z-index:1;";
+const dividerLine = document.createElement("div");
+dividerLine.style.cssText = "width:4px; height:100%; background:#ddd;";
+divider.append(dividerLine);
+divider.addEventListener("mouseenter", () => (dividerLine.style.background = "#aaa"));
+divider.addEventListener("mouseleave", () => {
+  if (!isDraggingDivider) dividerLine.style.background = "#ddd";
+});
 
 const canvasPanel = document.createElement("div");
-canvasPanel.style.cssText = "flex:1;";
+canvasPanel.style.cssText = "flex:1; min-width:0;";
 
 const canvas = document.createElement("canvas");
 canvas.style.cssText = "width:100%; height:100%; display:block;";
 canvasPanel.append(canvas);
 
-splitView.append(codePanel, canvasPanel);
+splitView.append(codePanel, divider, canvasPanel);
+
+// --- divider drag ---
+
+let isDraggingDivider = false;
+
+divider.addEventListener("mousedown", (e) => {
+  isDraggingDivider = true;
+  dividerLine.style.background = "#aaa";
+  e.preventDefault();
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (!isDraggingDivider) return;
+  const rect = splitView.getBoundingClientRect();
+  const pct = ((e.clientX - rect.left) / rect.width) * 100;
+  const clamped = Math.max(10, Math.min(90, pct));
+  codePanel.style.width = clamped + "%";
+});
+
+window.addEventListener("mouseup", () => {
+  if (!isDraggingDivider) return;
+  isDraggingDivider = false;
+  dividerLine.style.background = "#ddd";
+});
 main.append(editorView, splitView);
-document.body.append(toolbar, main);
+document.body.append(main);
 
 // --- state ---
 
@@ -144,9 +190,11 @@ setupCameraControls(canvas, cam, {
     const idx = hitTest(graphNodes, wx, wy);
     if (idx !== null) {
       dragIdx = idx;
+      return true;
     }
+    return false; // not on a node — let camera pan
   },
-  onMouseMove(wx, wy, sx, sy) {
+  onMouseMove(wx, wy, sx, sy, e) {
     if (dragIdx !== null) {
       graphNodes[dragIdx].x = wx;
       graphNodes[dragIdx].y = wy;
@@ -157,7 +205,9 @@ setupCameraControls(canvas, cam, {
     if (sx >= 0 && sy >= 0 && sx <= rect.width && sy <= rect.height) {
       const idx = hitTest(graphNodes, wx, wy);
       highlightIdx = idx;
-      canvas.style.cursor = idx !== null ? "grab" : "default";
+      if (!e.shiftKey) {
+        canvas.style.cursor = idx !== null ? "grab" : "crosshair";
+      }
       if (idx !== null) {
         const ast = graphNodes[idx].ast;
         highlightCodeRange(ast.spanStart, ast.spanEnd);
@@ -208,6 +258,7 @@ actionBtn.addEventListener("click", () => {
   if (inParseView) {
     editorView.style.display = "flex";
     splitView.style.display = "none";
+    editorView.prepend(header);
     actionBtn.textContent = "parse";
     errorDisplay.textContent = "";
     inParseView = false;
@@ -219,6 +270,7 @@ actionBtn.addEventListener("click", () => {
 
   editorView.style.display = "none";
   splitView.style.display = "flex";
+  codePanel.prepend(header);
   actionBtn.textContent = "edit";
   inParseView = true;
 
@@ -269,7 +321,8 @@ actionBtn.addEventListener("click", () => {
 
     ctx.save();
     applyCamera(ctx, cam, w, h);
-    drawGraph(ctx, graphNodes, graphEdges, highlightIdx);
+    drawDotGrid(ctx, cam, w, h);
+    drawGraph(ctx, cam, graphNodes, graphEdges, highlightIdx);
     ctx.restore();
   });
 });
