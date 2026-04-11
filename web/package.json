@@ -1,0 +1,17 @@
+{
+  "name": "web",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "scripts": {
+    "dev": "bun index.html",
+    "build": "bun build index.ts --outdir dist",
+    "build-wasm": "bun build-wasm.ts"
+  }
+}
