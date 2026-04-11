@@ -58,7 +58,7 @@ size_t skip_char_or_escape(const u8 *src, size_t pos, size_t len) {
 }
 
 void emit_token(Token *tokens, TokenizeResult *result, TokenType type,
-                       size_t start, size_t end) {
+                size_t start, size_t end) {
   tokens[result->count] = (Token){type, start, end};
   result->count++;
 }
@@ -67,7 +67,7 @@ TokenizeResult tokenize_fail(s8 msg, size_t pos) {
   return (TokenizeResult){.ok = false, .error_message = msg, .error_pos = pos};
 }
 
-TokenizeResult tokenize(s8 source, Arena *arena) {
+TokenizeResult tokenize(Arena *arena, s8 source) {
   size_t pos = 0;
   size_t len = source.length;
   const u8 *src = source.data;

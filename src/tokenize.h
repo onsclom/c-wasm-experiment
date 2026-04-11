@@ -86,4 +86,4 @@ typedef struct {
 } TokenizeResult;
 
 s8 token_type_name(TokenType type);
-TokenizeResult tokenize(s8 source, Arena *arena);
+TokenizeResult tokenize(Arena *arena, s8 source);

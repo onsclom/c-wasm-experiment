@@ -23,7 +23,7 @@ static void test_tokens(const char *name, const char *input,
   while (input[source.length])
     source.length++;
 
-  TokenizeResult result = tokenize(source, &arena);
+  TokenizeResult result = tokenize(&arena, source);
 
   if (!result.ok) {
     tests_failed++;
@@ -115,7 +115,7 @@ static void test_error(const char *name, const char *input,
   while (input[source.length])
     source.length++;
 
-  TokenizeResult result = tokenize(source, &arena);
+  TokenizeResult result = tokenize(&arena, source);
 
   if (result.ok) {
     tests_failed++;
