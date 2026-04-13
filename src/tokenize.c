@@ -60,7 +60,7 @@ size_t skip_char_or_escape(const u8 *src, size_t pos, size_t len) {
 
 void emit_token(Token *tokens, TokenizeResult *result, TokenType type,
                 size_t start, size_t end) {
-  tokens[result->count] = (Token){type, start, end};
+  tokens[result->count] = (Token){type, {start, end}};
   result->count++;
 }
 

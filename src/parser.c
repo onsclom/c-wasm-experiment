@@ -1,5 +1,28 @@
 #include "parser.h"
 
+static const s8 node_type_names[NODE_COUNT] = {
+    [NODE_INT_LITERAL] = s8_lit("IntLiteral"),
+    [NODE_FLOAT_LITERAL] = s8_lit("FloatLiteral"),
+    [NODE_STRING_LITERAL] = s8_lit("StringLiteral"),
+    [NODE_CHAR_LITERAL] = s8_lit("CharLiteral"),
+    [NODE_IDENTIFIER] = s8_lit("Identifier"),
+    [NODE_BINARY_EXPR] = s8_lit("BinaryExpr"),
+    [NODE_UNARY_EXPR] = s8_lit("UnaryExpr"),
+    [NODE_CALL_EXPR] = s8_lit("CallExpr"),
+    [NODE_EXPR_STMT] = s8_lit("ExprStmt"),
+    [NODE_RETURN_STMT] = s8_lit("ReturnStmt"),
+    [NODE_VAR_DECL] = s8_lit("VarDecl"),
+    [NODE_PARAM] = s8_lit("Param"),
+    [NODE_FUNC_DEF] = s8_lit("FuncDef"),
+    [NODE_PROGRAM] = s8_lit("Program"),
+};
+
+s8 node_type_name(ASTNodeType type) {
+  if (type >= 0 && type < NODE_COUNT && node_type_names[type].length > 0)
+    return node_type_names[type];
+  return s8_lit("Unknown");
+}
+
 typedef struct {
   Arena *arena;
   Token *tokens;
@@ -42,8 +65,8 @@ static void parser_error(Parser *p, s8 msg, size_t pos) {
 static Token parser_expect(Parser *p, TokenType type, s8 msg) {
   if (parser_check(p, type))
     return parser_advance(p);
-  size_t pos =
-      parser_at_end(p) ? p->tokens[p->count - 1].end : parser_peek(p).start;
+  size_t pos = parser_at_end(p) ? p->tokens[p->count - 1].span.end
+                                : parser_peek(p).span.start;
   parser_error(p, msg, pos);
   return (Token){0};
 }
@@ -55,7 +78,7 @@ static ASTNode *make_node(Parser *p, ASTNodeType type, Token token) {
   node->last_child = NULL;
   node->next_sibling = NULL;
   node->token = token;
-  node->span = (Span){token.start, token.end};
+  node->span = token.span;
   return node;
 }
 
@@ -155,7 +178,7 @@ static ASTNode *parse_prefix_or_atom(Parser *p) {
       }
       Token rparen = parser_expect(p, TOKEN_RPAREN,
                                    s8_lit("Expected ')' after arguments"));
-      call->span.end = rparen.end;
+      call->span.end = rparen.span.end;
       return call;
     }
     return make_node(p, NODE_IDENTIFIER, tok);
@@ -171,7 +194,7 @@ static ASTNode *parse_prefix_or_atom(Parser *p) {
   }
 
   default:
-    parser_error(p, s8_lit("Expected expression"), tok.start);
+    parser_error(p, s8_lit("Expected expression"), tok.span.start);
     return NULL;
   }
 }
@@ -223,7 +246,7 @@ static ASTNode *parse_statement(Parser *p) {
     }
     Token semi =
         parser_expect(p, TOKEN_SEMICOLON, s8_lit("Expected ';' after return"));
-    node->span.end = semi.end;
+    node->span.end = semi.span.end;
     return node;
   }
 
@@ -246,7 +269,7 @@ static ASTNode *parse_statement(Parser *p) {
         }
         Token semi = parser_expect(p, TOKEN_SEMICOLON,
                                    s8_lit("Expected ';' after declaration"));
-        decl->span.end = semi.end;
+        decl->span.end = semi.span.end;
         return decl;
       }
     }
@@ -262,7 +285,7 @@ static ASTNode *parse_statement(Parser *p) {
   add_child(stmt, expr);
   Token semi = parser_expect(p, TOKEN_SEMICOLON,
                              s8_lit("Expected ';' after expression"));
-  stmt->span.end = semi.end;
+  stmt->span.end = semi.span.end;
   return stmt;
 }
 
@@ -272,7 +295,7 @@ static ASTNode *parse_func_def(Parser *p) {
 
   Token type_tok = parser_peek(p);
   if (!is_type_keyword(type_tok.type)) {
-    parser_error(p, s8_lit("Expected type keyword"), type_tok.start);
+    parser_error(p, s8_lit("Expected type keyword"), type_tok.span.start);
     return NULL;
   }
   parser_advance(p);
@@ -297,7 +320,8 @@ static ASTNode *parse_func_def(Parser *p) {
       do {
         Token param_type = parser_peek(p);
         if (!is_type_keyword(param_type.type)) {
-          parser_error(p, s8_lit("Expected parameter type"), param_type.start);
+          parser_error(p, s8_lit("Expected parameter type"),
+                       param_type.span.start);
           return NULL;
         }
         parser_advance(p);
@@ -308,7 +332,7 @@ static ASTNode *parse_func_def(Parser *p) {
         ASTNode *param = make_node(p, NODE_PARAM, param_type);
         ASTNode *pname = make_node(p, NODE_IDENTIFIER, param_name);
         add_child(param, pname);
-        param->span.end = param_name.end;
+        param->span.end = param_name.span.end;
         add_child(func, param);
       } while (parser_match(p, TOKEN_COMMA));
     }
@@ -330,7 +354,7 @@ static ASTNode *parse_func_def(Parser *p) {
 
   Token rbrace = parser_expect(p, TOKEN_RBRACE,
                                s8_lit("Expected '}' after function body"));
-  func->span.end = rbrace.end;
+  func->span.end = rbrace.span.end;
   return func;
 }
 

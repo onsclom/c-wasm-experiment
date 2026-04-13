@@ -1,21 +1,3 @@
-// maps to ASTNodeType enum in parser.h
-const NODE_TYPE_NAMES = [
-  "IntLiteral",
-  "FloatLiteral",
-  "StringLiteral",
-  "CharLiteral",
-  "Identifier",
-  "BinaryExpr",
-  "UnaryExpr",
-  "CallExpr",
-  "ExprStmt",
-  "ReturnStmt",
-  "VarDecl",
-  "Param",
-  "FuncDef",
-  "Program",
-] as const;
-
 interface WasmExports {
   memory: WebAssembly.Memory;
   get_input_buffer(): number;
@@ -27,6 +9,8 @@ interface WasmExports {
   result_error_pos(): number;
   result_root(): number;
   node_type(ptr: number): number;
+  node_type_name_ptr(ptr: number): number;
+  node_type_name_len(ptr: number): number;
   node_first_child(ptr: number): number;
   node_next_sibling(ptr: number): number;
   node_token_start(ptr: number): number;
@@ -91,8 +75,14 @@ export function parseCode(source: string): ParseResult {
   return { ok: true, root };
 }
 
+const decoder = new TextDecoder();
+
 function walkNode(ptr: number, source: string): ASTNode {
-  const typeIdx = wasm.node_type(ptr);
+  const mem = new Uint8Array(wasm.memory.buffer);
+  const namePtr = wasm.node_type_name_ptr(ptr);
+  const nameLen = wasm.node_type_name_len(ptr);
+  const type = decoder.decode(mem.slice(namePtr, namePtr + nameLen));
+
   const tokStart = wasm.node_token_start(ptr);
   const tokEnd = wasm.node_token_end(ptr);
   const text = source.slice(tokStart, tokEnd);
@@ -107,11 +97,5 @@ function walkNode(ptr: number, source: string): ASTNode {
   const spanStart = wasm.node_span_start(ptr);
   const spanEnd = wasm.node_span_end(ptr);
 
-  return {
-    type: NODE_TYPE_NAMES[typeIdx] ?? `Unknown(${typeIdx})`,
-    text,
-    spanStart,
-    spanEnd,
-    children,
-  };
+  return { type, text, spanStart, spanEnd, children };
 }

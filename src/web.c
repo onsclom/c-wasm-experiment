@@ -67,13 +67,17 @@ size_t result_root(void) { return (size_t)last_result.root; }
 
 i32 node_type(ASTNode *node) { return (i32)node->type; }
 
+u8 *node_type_name_ptr(ASTNode *node) { return node_type_name(node->type).data; }
+
+size_t node_type_name_len(ASTNode *node) { return node_type_name(node->type).length; }
+
 size_t node_first_child(ASTNode *node) { return (size_t)node->first_child; }
 
 size_t node_next_sibling(ASTNode *node) { return (size_t)node->next_sibling; }
 
-size_t node_token_start(ASTNode *node) { return node->token.start; }
+size_t node_token_start(ASTNode *node) { return node->token.span.start; }
 
-size_t node_token_end(ASTNode *node) { return node->token.end; }
+size_t node_token_end(ASTNode *node) { return node->token.span.end; }
 
 size_t node_span_start(ASTNode *node) { return node->span.start; }
 

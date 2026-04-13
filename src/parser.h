@@ -2,11 +2,6 @@
 
 #include "tokenize.h"
 
-typedef struct {
-  size_t start;
-  size_t end;
-} Span;
-
 typedef enum {
   NODE_INT_LITERAL,
   NODE_FLOAT_LITERAL,
@@ -25,6 +20,8 @@ typedef enum {
   NODE_PARAM,        // type name
   NODE_FUNC_DEF,     // type name(params) { body }
   NODE_PROGRAM,      // list of top-level declarations
+
+  NODE_COUNT,
 } ASTNodeType;
 
 typedef struct ASTNode ASTNode;
@@ -50,4 +47,5 @@ typedef struct {
   size_t error_pos;
 } ParseResult;
 
+s8 node_type_name(ASTNodeType type);
 ParseResult parse(Arena *arena, Token *tokens, size_t token_count);

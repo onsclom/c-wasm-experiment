@@ -70,10 +70,13 @@ typedef enum {
 } TokenType;
 
 typedef struct {
-  TokenType type;
-  // slice into the source string
   size_t start;
   size_t end;
+} Span;
+
+typedef struct {
+  TokenType type;
+  Span span;
 } Token;
 
 typedef struct {

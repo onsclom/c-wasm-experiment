@@ -39,45 +39,12 @@ static void buf_indent(StrBuf *b, i32 depth) {
 }
 
 static void buf_token_text(StrBuf *b, Token tok, s8 source) {
-  for (size_t i = tok.start; i < tok.end && i < source.length; i++)
+  for (size_t i = tok.span.start; i < tok.span.end && i < source.length; i++)
     buf_char(b, (char)source.data[i]);
 }
 
 // ===== AST pretty printer =====
 
-static const char *ast_node_name(ASTNodeType type) {
-  switch (type) {
-  case NODE_PROGRAM:
-    return "Program";
-  case NODE_FUNC_DEF:
-    return "FuncDef";
-  case NODE_PARAM:
-    return "Param";
-  case NODE_IDENTIFIER:
-    return "Identifier";
-  case NODE_INT_LITERAL:
-    return "IntLiteral";
-  case NODE_FLOAT_LITERAL:
-    return "FloatLiteral";
-  case NODE_STRING_LITERAL:
-    return "StringLiteral";
-  case NODE_CHAR_LITERAL:
-    return "CharLiteral";
-  case NODE_BINARY_EXPR:
-    return "BinaryExpr";
-  case NODE_UNARY_EXPR:
-    return "UnaryExpr";
-  case NODE_CALL_EXPR:
-    return "CallExpr";
-  case NODE_EXPR_STMT:
-    return "ExprStmt";
-  case NODE_RETURN_STMT:
-    return "ReturnStmt";
-  case NODE_VAR_DECL:
-    return "VarDecl";
-  }
-  return "Unknown";
-}
 
 static bool ast_node_shows_token(ASTNodeType type) {
   switch (type) {
@@ -95,7 +62,9 @@ static void ast_print_node(StrBuf *b, ASTNode *node, s8 source, i32 depth) {
     return;
 
   buf_indent(b, depth);
-  buf_str(b, ast_node_name(node->type));
+  s8 name = node_type_name(node->type);
+  for (size_t i = 0; i < name.length; i++)
+    buf_char(b, (char)name.data[i]);
 
   if (ast_node_shows_token(node->type)) {
     buf_str(b, " '");
@@ -291,8 +260,8 @@ static void test_tokens(const char *name, const char *input,
         pass = false;
         break;
       }
-      size_t tok_len = tok->end - tok->start;
-      const u8 *tok_text = source.data + tok->start;
+      size_t tok_len = tok->span.end - tok->span.start;
+      const u8 *tok_text = source.data + tok->span.start;
       const char *exp_text = expected[i].text;
       size_t exp_len = 0;
       while (exp_text[exp_len])
@@ -330,11 +299,11 @@ static void test_tokens(const char *name, const char *input,
         s8 tname = token_type_name(tok->type);
         snprintf(got_buf, sizeof(got_buf), "%.*s", (i32)tname.length,
                  (char *)tname.data);
-        size_t tok_len = tok->end - tok->start;
+        size_t tok_len = tok->span.end - tok->span.start;
         if (tok_len >= sizeof(got_text))
           tok_len = sizeof(got_text) - 1;
         for (size_t j = 0; j < tok_len; j++)
-          got_text[j] = (char)source.data[tok->start + j];
+          got_text[j] = (char)source.data[tok->span.start + j];
         got_text[tok_len] = '\0';
       }
       if (i < expected_count) {
