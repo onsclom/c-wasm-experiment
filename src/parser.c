@@ -106,7 +106,7 @@ static i32 infix_precedence(TokenType type) {
 
 static ASTNode *parse_expr(Parser *p, i32 min_prec);
 
-static ASTNode *parse_prefix(Parser *p) {
+static ASTNode *parse_prefix_or_atom(Parser *p) {
   if (p->had_error || parser_at_end(p))
     return NULL;
 
@@ -126,18 +126,17 @@ static ASTNode *parse_prefix(Parser *p) {
 
   switch (tok.type) {
   case TOKEN_INT_LITERAL:
-  case TOKEN_FLOAT_LITERAL:
-  case TOKEN_STRING_LITERAL:
-  case TOKEN_CHAR_LITERAL: {
-    static const ASTNodeType literal_map[] = {
-        [TOKEN_INT_LITERAL] = NODE_INT_LITERAL,
-        [TOKEN_FLOAT_LITERAL] = NODE_FLOAT_LITERAL,
-        [TOKEN_STRING_LITERAL] = NODE_STRING_LITERAL,
-        [TOKEN_CHAR_LITERAL] = NODE_CHAR_LITERAL,
-    };
     parser_advance(p);
-    return make_node(p, literal_map[tok.type], tok);
-  }
+    return make_node(p, NODE_INT_LITERAL, tok);
+  case TOKEN_FLOAT_LITERAL:
+    parser_advance(p);
+    return make_node(p, NODE_FLOAT_LITERAL, tok);
+  case TOKEN_STRING_LITERAL:
+    parser_advance(p);
+    return make_node(p, NODE_STRING_LITERAL, tok);
+  case TOKEN_CHAR_LITERAL:
+    parser_advance(p);
+    return make_node(p, NODE_CHAR_LITERAL, tok);
 
   case TOKEN_IDENTIFIER: {
     parser_advance(p);
@@ -178,7 +177,7 @@ static ASTNode *parse_prefix(Parser *p) {
 }
 
 static ASTNode *parse_expr(Parser *p, i32 min_prec) {
-  ASTNode *left = parse_prefix(p);
+  ASTNode *left = parse_prefix_or_atom(p);
   if (!left)
     return NULL;
 
