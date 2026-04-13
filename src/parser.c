@@ -34,16 +34,24 @@ typedef struct {
   size_t error_pos;
 } Parser;
 
-static Token parser_peek(Parser *p) { return p->tokens[p->pos]; }
+static bool parser_at_end(Parser *p) {
+  return p->had_error || p->pos >= p->count;
+}
 
-static Token parser_advance(Parser *p) { return p->tokens[p->pos++]; }
+static Token parser_peek(Parser *p) {
+  if (parser_at_end(p))
+    return (Token){0};
+  return p->tokens[p->pos];
+}
 
-static bool parser_at_end(Parser *p) { return p->pos >= p->count; }
+static Token parser_advance(Parser *p) {
+  if (parser_at_end(p))
+    return (Token){0};
+  return p->tokens[p->pos++];
+}
 
 static bool parser_check(Parser *p, TokenType type) {
-  if (parser_at_end(p))
-    return false;
-  return parser_peek(p).type == type;
+  return !parser_at_end(p) && parser_peek(p).type == type;
 }
 
 static bool parser_match(Parser *p, TokenType type) {
@@ -130,9 +138,6 @@ static i32 infix_precedence(TokenType type) {
 static ASTNode *parse_expr(Parser *p, i32 min_prec);
 
 static ASTNode *parse_prefix_or_atom(Parser *p) {
-  if (p->had_error || parser_at_end(p))
-    return NULL;
-
   Token tok = parser_peek(p);
 
   i32 prec = prefix_precedence(tok.type);
@@ -170,7 +175,7 @@ static ASTNode *parse_prefix_or_atom(Parser *p) {
         ASTNode *arg = parse_expr(p, 0);
         if (arg)
           add_child(call, arg);
-        while (!p->had_error && parser_match(p, TOKEN_COMMA)) {
+        while (parser_match(p, TOKEN_COMMA)) {
           arg = parse_expr(p, 0);
           if (arg)
             add_child(call, arg);
@@ -204,7 +209,7 @@ static ASTNode *parse_expr(Parser *p, i32 min_prec) {
   if (!left)
     return NULL;
 
-  while (!p->had_error && !parser_at_end(p)) {
+  while (!parser_at_end(p)) {
     Token op = parser_peek(p);
     i32 prec = infix_precedence(op.type);
     if (prec < 0 || prec < min_prec)
@@ -231,9 +236,6 @@ static bool is_type_keyword(TokenType type) {
 }
 
 static ASTNode *parse_statement(Parser *p) {
-  if (p->had_error || parser_at_end(p))
-    return NULL;
-
   Token tok = parser_peek(p);
 
   if (tok.type == TOKEN_KEYWORD_RETURN) {
@@ -254,7 +256,7 @@ static ASTNode *parse_statement(Parser *p) {
     size_t saved_pos = p->pos;
     Token type_tok = parser_advance(p);
 
-    if (!parser_at_end(p) && parser_check(p, TOKEN_IDENTIFIER)) {
+    if (parser_check(p, TOKEN_IDENTIFIER)) {
       Token name_tok = parser_advance(p);
 
       if (parser_check(p, TOKEN_EQ) || parser_check(p, TOKEN_SEMICOLON)) {
@@ -290,9 +292,6 @@ static ASTNode *parse_statement(Parser *p) {
 }
 
 static ASTNode *parse_func_def(Parser *p) {
-  if (p->had_error || parser_at_end(p))
-    return NULL;
-
   Token type_tok = parser_peek(p);
   if (!is_type_keyword(type_tok.type)) {
     parser_error(p, s8_lit("Expected type keyword"), type_tok.span.start);
@@ -302,15 +301,11 @@ static ASTNode *parse_func_def(Parser *p) {
 
   Token name_tok =
       parser_expect(p, TOKEN_IDENTIFIER, s8_lit("Expected function name"));
-  if (p->had_error)
-    return NULL;
 
   ASTNode *func = make_node(p, NODE_FUNC_DEF, type_tok);
   add_child(func, make_node(p, NODE_IDENTIFIER, name_tok));
 
   parser_expect(p, TOKEN_LPAREN, s8_lit("Expected '(' after function name"));
-  if (p->had_error)
-    return NULL;
 
   if (!parser_check(p, TOKEN_RPAREN)) {
     if (parser_check(p, TOKEN_KEYWORD_VOID) && p->pos + 1 < p->count &&
@@ -327,8 +322,6 @@ static ASTNode *parse_func_def(Parser *p) {
         parser_advance(p);
         Token param_name = parser_expect(p, TOKEN_IDENTIFIER,
                                          s8_lit("Expected parameter name"));
-        if (p->had_error)
-          return NULL;
         ASTNode *param = make_node(p, NODE_PARAM, param_type);
         ASTNode *pname = make_node(p, NODE_IDENTIFIER, param_name);
         add_child(param, pname);
@@ -339,14 +332,9 @@ static ASTNode *parse_func_def(Parser *p) {
   }
 
   parser_expect(p, TOKEN_RPAREN, s8_lit("Expected ')' after parameters"));
-  if (p->had_error)
-    return NULL;
-
   parser_expect(p, TOKEN_LBRACE, s8_lit("Expected '{' before function body"));
-  if (p->had_error)
-    return NULL;
 
-  while (!p->had_error && !parser_at_end(p) && !parser_check(p, TOKEN_RBRACE)) {
+  while (!parser_at_end(p) && !parser_check(p, TOKEN_RBRACE)) {
     ASTNode *stmt = parse_statement(p);
     if (stmt)
       add_child(func, stmt);
@@ -370,7 +358,7 @@ ParseResult parse(Arena *arena, Token *tokens, size_t token_count) {
   Token first_tok = token_count > 0 ? tokens[0] : (Token){0};
   ASTNode *program = make_node(&p, NODE_PROGRAM, first_tok);
 
-  while (!p.had_error && !parser_at_end(&p)) {
+  while (!parser_at_end(&p)) {
     ASTNode *func = parse_func_def(&p);
     if (func)
       add_child(program, func);
