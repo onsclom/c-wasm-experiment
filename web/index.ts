@@ -22,12 +22,9 @@ const actionBtn = document.createElement("button");
 actionBtn.textContent = "parse";
 actionBtn.style.cssText = "padding:6px 20px; font-size:15px;";
 
-const errorDisplay = document.createElement("span");
-errorDisplay.style.cssText = "color:red; font-size:13px;";
-
 const header = document.createElement("div");
 header.style.cssText = "display:flex; align-items:center; gap:10px; padding:8px 12px; flex-shrink:0;";
-header.append(title, actionBtn, errorDisplay);
+header.append(title, actionBtn);
 
 const main = document.createElement("div");
 main.style.cssText = "flex:1; display:flex; overflow:hidden;";
@@ -133,13 +130,47 @@ const cam = createCamera();
 
 // --- code panel: render source as per-character spans ---
 
-function renderCodePanel(source: string) {
+function renderCodePanel(source: string, error?: { pos: number; message: string }) {
   codeDisplay.innerHTML = "";
   for (let i = 0; i < source.length; i++) {
     const span = document.createElement("span");
     span.textContent = source[i];
     span.dataset.pos = String(i);
     codeDisplay.appendChild(span);
+  }
+
+  if (error) {
+    // find the line containing the error and highlight from error pos to end of that line
+    const lineStart = source.lastIndexOf("\n", error.pos - 1) + 1;
+    let lineEnd = source.indexOf("\n", error.pos);
+    if (lineEnd === -1) lineEnd = source.length;
+
+    // if error is at end of line / whitespace, highlight at least one char back
+    const errStart = error.pos;
+    const errEnd = Math.max(error.pos + 1, lineEnd);
+
+    const spans = codeDisplay.children;
+    for (let i = errStart; i < errEnd && i < spans.length; i++) {
+      const el = spans[i] as HTMLElement;
+      el.style.backgroundColor = "#fdd";
+      el.style.textDecoration = "wavy underline red";
+      el.style.textDecorationSkipInk = "none";
+      el.style.textUnderlineOffset = "3px";
+    }
+
+    // insert inline error tooltip after the error region
+    const tooltip = document.createElement("span");
+    tooltip.textContent = `  ← ${error.message}`;
+    tooltip.style.cssText =
+      "color:#c33; font-size:12px; font-style:italic; pointer-events:none; user-select:none;";
+
+    // insert after the last char of the error line
+    const anchor = spans[Math.min(errEnd, spans.length) - 1];
+    if (anchor) {
+      anchor.after(tooltip);
+      // scroll error into view
+      (spans[errStart] as HTMLElement)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
   }
 }
 
@@ -260,7 +291,6 @@ actionBtn.addEventListener("click", () => {
     splitView.style.display = "none";
     editorView.prepend(header);
     actionBtn.textContent = "parse";
-    errorDisplay.textContent = "";
     inParseView = false;
     return;
   }
@@ -275,27 +305,19 @@ actionBtn.addEventListener("click", () => {
   inParseView = true;
 
   if (!result.ok) {
-    renderCodePanel(sourceCode);
-    errorDisplay.textContent = `Error at pos ${result.error.pos}: ${result.error.message}`;
+    renderCodePanel(sourceCode, result.error);
     graphNodes = [];
     graphEdges = [];
-    // highlight error position in code
-    highlightCodeRange(result.error.pos, result.error.pos + 1);
 
     startLoop(canvas, (ctx) => {
       const w = canvas.width / devicePixelRatio;
       const h = canvas.height / devicePixelRatio;
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = "#c33";
-      ctx.font = "16px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText(`Parse error: ${result.error.message}`, w / 2, h / 2);
     });
     return;
   }
 
-  errorDisplay.textContent = "";
   renderCodePanel(sourceCode);
 
   const graph = buildGraph(result.root);
