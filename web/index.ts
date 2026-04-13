@@ -22,9 +22,15 @@ const actionBtn = document.createElement("button");
 actionBtn.textContent = "parse";
 actionBtn.style.cssText = "padding:6px 20px; font-size:15px;";
 
+const sourceLink = document.createElement("a");
+sourceLink.href = "https://github.com/onsclom/c-wasm-experiment";
+sourceLink.target = "_blank";
+sourceLink.textContent = "view source";
+sourceLink.style.cssText = "margin-left:auto;";
+
 const header = document.createElement("div");
 header.style.cssText = "display:flex; align-items:center; gap:10px; padding:8px 12px; flex-shrink:0;";
-header.append(title, actionBtn);
+header.append(title, actionBtn, sourceLink);
 
 const main = document.createElement("div");
 main.style.cssText = "flex:1; display:flex; overflow:hidden;";
