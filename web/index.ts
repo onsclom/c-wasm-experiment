@@ -68,7 +68,7 @@ codePanel.style.cssText =
 
 const codeDisplay = document.createElement("pre");
 codeDisplay.style.cssText =
-  "font-family:monospace; font-size:14px; white-space:pre; line-height:1.5;";
+  "font-family:monospace; font-size:14px; white-space:pre; line-height:1.5; cursor:crosshair;";
 const codeScroll = document.createElement("div");
 codeScroll.style.cssText = "flex:1; overflow:auto; padding:0 12px 12px;";
 codeScroll.append(codeDisplay);

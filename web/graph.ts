@@ -41,7 +41,9 @@ export function measureNodes(
 ) {
   ctx.font = NODE_FONT;
   for (const n of nodes) {
-    const label = `${n.ast.type}: ${n.ast.text}`;
+    const label = n.ast.type === "Program" || !n.ast.text
+      ? n.ast.type
+      : `${n.ast.type}: ${n.ast.text}`;
     n.w = ctx.measureText(label).width + NODE_PAD_X * 2;
   }
 }
@@ -360,7 +362,9 @@ export function drawGraph(
   ctx.lineWidth = 2;
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
-    const label = `${n.ast.type}: ${n.ast.text}`;
+    const label = n.ast.type === "Program" || !n.ast.text
+      ? n.ast.type
+      : `${n.ast.type}: ${n.ast.text}`;
     const isHighlight = i === highlightIdx;
 
     const rx = n.x - n.w / 2;
